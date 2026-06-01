@@ -13,7 +13,6 @@ export const siteConfig = {
   phone: "385-787-9568",
   location: "South Jordan, UT",
   social: {
-    instagram: "https://instagram.com/",
-    facebook: "https://facebook.com/",
+    instagram: "https://www.instagram.com/cmc___photographyslc",
   },
 } as const;
