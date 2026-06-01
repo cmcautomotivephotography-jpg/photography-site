@@ -59,9 +59,9 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.rpc("submit_inquiry", {
     p_first_name: firstName,
     p_last_name: lastName,
-    p_company: company,
-    p_phone: phone,
     p_email: email,
+    p_phone: phone,
+    p_company: company,
     p_job_type: jobType,
     p_description: description,
     p_preferred_shoot_date: preferredDate,
@@ -69,11 +69,22 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    console.error("Supabase submit_inquiry error:", error);
-    return NextResponse.json(
-      { error: "We couldn't save your inquiry. Please try again in a moment." },
-      { status: 500 },
-    );
+    // Surface the real Postgres/PostgREST error so failures are debuggable in
+    // both the Vercel logs and the response. When the function works from the
+    // SQL editor but fails here, the usual causes are:
+    //   1. The `anon` role lacks EXECUTE on submit_inquiry — run the GRANT at
+    //      the bottom of supabase-schema.sql.
+    //   2. PostgREST's schema cache is stale — in Supabase go to
+    //      Settings -> API -> "Reload schema cache" (or run in SQL:
+    //      NOTIFY pgrst, 'reload schema';).
+    //   3. The function body references a column your tables don't have.
+    console.error("Supabase submit_inquiry error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, jobId: data });
