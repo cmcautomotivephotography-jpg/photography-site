@@ -14,7 +14,7 @@ export default function AboutPage() {
         <div className="container">
           <p className="eyebrow">About</p>
           <h1>Behind the Lens</h1>
-          <p>A quick introduction — replace this copy and the headshot with your own.</p>
+          <p>Real estate and commercial product photography across the Salt Lake City area.</p>
         </div>
       </section>
 
@@ -25,20 +25,25 @@ export default function AboutPage() {
           </div>
 
           <div className="about-body">
-            <h2>Hi, I&apos;m the photographer behind {siteConfig.name}.</h2>
+            <h2>Vision That Sells</h2>
             <p className="text-muted">
-              This is placeholder bio copy. Use this space to tell potential
-              clients who you are, your background, and what makes your work
-              different. Mention the areas you serve, the gear or style you
-              shoot with, and the kinds of clients you love working with.
+              {siteConfig.name} specializes in real estate and commercial
+              product photography across the Salt Lake City area. With a sharp
+              eye for composition and lighting, we create images that
+              don&apos;t just document a space or product — they sell it.
             </p>
             <p className="text-muted">
-              For real estate agents, that might mean fast turnarounds and
-              listing-ready galleries. For commercial clients, it might mean a
-              consistent, on-brand look across every product and campaign.
+              Whether you&apos;re a real estate agent looking to make listings
+              stand out in a competitive market, or a brand that needs product
+              shots that convert browsers into buyers, we deliver edited,
+              ready-to-use images that do the work for you.
+            </p>
+            <p className="text-muted">
+              Based in South Jordan, Utah. Available throughout the Wasatch
+              Front.
             </p>
 
-            <h2>What I offer</h2>
+            <h2>What we offer</h2>
             <ul className="about-list">
               <li>Real estate interior, exterior, and twilight photography</li>
               <li>Product and packaging photography for e-commerce and print</li>
@@ -48,7 +53,7 @@ export default function AboutPage() {
 
             <p style={{ marginTop: "2rem" }}>
               <Link href="/booking" className="btn btn-primary">
-                Work with me
+                Work with us
               </Link>
             </p>
           </div>
