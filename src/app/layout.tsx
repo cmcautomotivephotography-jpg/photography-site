@@ -1,19 +1,31 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Barlow, Barlow_Condensed, Pacifico } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { siteConfig } from "@/lib/site";
 
-const inter = Inter({
+// Body + UI text — clean sans, same family as the condensed headings.
+const barlow = Barlow({
   subsets: ["latin"],
-  variable: "--font-sans",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-barlow",
   display: "swap",
 });
 
-const playfair = Playfair_Display({
+// Headings + logo / site name — heavy geometric condensed, used uppercase.
+const barlowCondensed = Barlow_Condensed({
   subsets: ["latin"],
-  variable: "--font-serif",
+  weight: ["800"],
+  variable: "--font-barlow-condensed",
+  display: "swap",
+});
+
+// Script accent — used only for the hero tagline ("Vision That Sells").
+const pacifico = Pacifico({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-pacifico",
   display: "swap",
 });
 
@@ -31,7 +43,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html
+      lang="en"
+      className={`${barlow.variable} ${barlowCondensed.variable} ${pacifico.variable}`}
+    >
       <body>
         <Header />
         <main>{children}</main>
