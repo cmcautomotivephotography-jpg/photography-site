@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { siteConfig } from "@/lib/site";
+import { getLatestImageUrl } from "@/lib/portfolio";
 import PortfolioTeaser from "@/components/PortfolioTeaser";
+
+// Render on demand so the hero always reflects the latest uploaded image
+// (rather than baking one in at build time).
+export const dynamic = "force-dynamic";
 
 const services = [
   {
@@ -15,11 +20,28 @@ const services = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Hardcoded override wins; otherwise fall back to the most recent upload.
+  const heroImage = siteConfig.heroImage || (await getLatestImageUrl());
+
   return (
     <>
       {/* Hero */}
-      <section className="hero">
+      <section
+        className={`hero${heroImage ? " hero--image" : ""}`}
+        style={
+          heroImage
+            ? {
+                // Dark overlay (55% black) layered over the photo keeps the
+                // white text readable regardless of the image.
+                backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("${heroImage}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+              }
+            : undefined
+        }
+      >
         <div className="container hero-inner">
           <p className="eyebrow">{siteConfig.tagline}</p>
           <h1 className="hero-title">{siteConfig.name}</h1>

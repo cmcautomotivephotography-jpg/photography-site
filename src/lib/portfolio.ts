@@ -79,3 +79,27 @@ export async function getPortfolioItems(): Promise<PortfolioItem[]> {
 
   return items.map(({ uploadedAt: _uploadedAt, ...item }) => item);
 }
+
+/**
+ * URL of the most recently uploaded image in Blob storage, used as the home
+ * hero background. Returns null when the store is empty or unconfigured (the
+ * hero then falls back to its gradient). Resilient by design: any error
+ * resolves to null so a Blob hiccup can never break the home page.
+ */
+export async function getLatestImageUrl(): Promise<string | null> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+
+  try {
+    const { list } = await import("@vercel/blob");
+    const { blobs } = await list();
+
+    const newest = blobs
+      .filter((blob) => /\.(jpe?g|png|webp|avif|gif)$/i.test(blob.pathname))
+      .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))[0];
+
+    return newest?.url ?? null;
+  } catch (error) {
+    console.error("Failed to load hero image from Blob:", error);
+    return null;
+  }
+}

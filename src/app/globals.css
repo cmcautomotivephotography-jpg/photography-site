@@ -283,6 +283,19 @@ img {
   max-width: 760px;
 }
 
+/* When a Blob photo backs the hero, the section's inline style supplies the
+   image + dark overlay. These rules only boost text legibility on top of it —
+   layout, spacing, and element positions are unchanged. */
+.hero--image .hero-sub {
+  color: #ececef;
+}
+
+.hero--image .eyebrow,
+.hero--image .hero-title,
+.hero--image .hero-sub {
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
 .hero-title {
   font-size: clamp(2.8rem, 8vw, 5rem);
   margin-bottom: 0.3em;
