@@ -13,8 +13,8 @@
   --text-muted: #a1a1aa;
   --text-faint: #71717a;
 
-  --accent: #e7c08b; /* warm, understated gold */
-  --accent-strong: #f0d3a8;
+  --accent: #FF3B4E; /* brand red */
+  --accent-strong: #FF5C6A; /* lighter brand red, used for hover */
   --accent-ink: #14110a;
 
   --radius: 14px;
@@ -273,7 +273,7 @@ img {
   padding: clamp(96px, 16vw, 184px) 0 clamp(80px, 12vw, 140px);
   overflow: hidden;
   background:
-    radial-gradient(1200px 600px at 70% -10%, rgba(231, 192, 139, 0.12), transparent 60%),
+    radial-gradient(1200px 600px at 70% -10%, rgba(255, 59, 78, 0.12), transparent 60%),
     radial-gradient(900px 500px at 0% 110%, rgba(255, 255, 255, 0.05), transparent 55%),
     linear-gradient(180deg, #0c0c0d 0%, #121214 100%);
   border-bottom: 1px solid var(--border);
@@ -470,7 +470,7 @@ img {
    =========================================================================== */
 .cta-band {
   background:
-    radial-gradient(800px 400px at 80% 0%, rgba(231, 192, 139, 0.1), transparent 60%),
+    radial-gradient(800px 400px at 80% 0%, rgba(255, 59, 78, 0.1), transparent 60%),
     var(--bg-elevated);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -660,7 +660,7 @@ img {
 .form-field textarea:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(231, 192, 139, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 59, 78, 0.15);
 }
 
 .form-field input[aria-invalid="true"],
