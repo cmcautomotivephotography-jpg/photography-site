@@ -1,15 +1,12 @@
 export type PortfolioCategory = "real-estate" | "commercial";
 
 export interface PortfolioItem {
-  id: number;
+  /** Stable id — we use the blob pathname, which is unique per object. */
+  id: string;
   title: string;
   category: PortfolioCategory;
-  /**
-   * Optional image path. Leave undefined to show a styled placeholder tile.
-   * To use a real photo, drop it in /public (e.g. /public/portfolio/kitchen.jpg)
-   * and set src: "/portfolio/kitchen.jpg".
-   */
-  src?: string;
+  /** Public URL of the image in Vercel Blob storage. */
+  src: string;
 }
 
 export const categoryLabels: Record<PortfolioCategory, string> = {
@@ -18,20 +15,67 @@ export const categoryLabels: Record<PortfolioCategory, string> = {
 };
 
 /**
- * Placeholder portfolio data. Swap these out (or add a `src`) once you have
- * real images. The category drives the filter buttons on /portfolio.
+ * Filename prefixes drive the category. The admin upload page prepends one of
+ * these before sending the file to Blob storage, and we read it back here to
+ * sort images into the right filter.
  */
-export const portfolioItems: PortfolioItem[] = [
-  { id: 1, title: "Modern Kitchen", category: "real-estate" },
-  { id: 2, title: "Living Room at Dusk", category: "real-estate" },
-  { id: 3, title: "Product — Skincare Line", category: "commercial" },
-  { id: 4, title: "Master Suite", category: "real-estate" },
-  { id: 5, title: "Restaurant Interior", category: "commercial" },
-  { id: 6, title: "Backyard & Pool", category: "real-estate" },
-  { id: 7, title: "Product — Coffee Packaging", category: "commercial" },
-  { id: 8, title: "Open Floor Plan", category: "real-estate" },
-  { id: 9, title: "Brand Lifestyle Shoot", category: "commercial" },
-  { id: 10, title: "Twilight Exterior", category: "real-estate" },
-  { id: 11, title: "Product — Watch Detail", category: "commercial" },
-  { id: 12, title: "Staged Dining Room", category: "real-estate" },
-];
+export const categoryPrefixes: Record<PortfolioCategory, string> = {
+  "real-estate": "real-estate-",
+  commercial: "commercial-",
+};
+
+/** Map a stored filename back to a category via its prefix (null if neither). */
+function categoryForFilename(filename: string): PortfolioCategory | null {
+  if (filename.startsWith(categoryPrefixes["real-estate"])) return "real-estate";
+  if (filename.startsWith(categoryPrefixes.commercial)) return "commercial";
+  return null;
+}
+
+/**
+ * Turn a stored filename like "real-estate-modern-kitchen-x7Kd9q2a.jpg" into a
+ * readable caption ("Modern Kitchen"). Strips the category prefix, extension,
+ * and the random suffix Blob adds to avoid name collisions.
+ */
+function titleFromFilename(filename: string, category: PortfolioCategory): string {
+  const withoutPrefix = filename.slice(categoryPrefixes[category].length);
+  const base = withoutPrefix
+    .replace(/\.[^.]+$/, "") // drop extension
+    .replace(/-[a-zA-Z0-9]{12,}$/, "") // drop random suffix from addRandomSuffix
+    .replace(/[-_]+/g, " ")
+    .trim();
+
+  if (!base) return categoryLabels[category];
+  return base.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Dynamically fetch the portfolio from Vercel Blob storage. Returns an empty
+ * list when the store isn't configured yet (no BLOB_READ_WRITE_TOKEN) so the
+ * site still builds and renders. Server-only: the Blob SDK is imported lazily
+ * so it never lands in a client bundle.
+ */
+export async function getPortfolioItems(): Promise<PortfolioItem[]> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return [];
+
+  const { list } = await import("@vercel/blob");
+  const { blobs } = await list();
+
+  const items = blobs
+    .map((blob) => {
+      const filename = blob.pathname.split("/").pop() ?? blob.pathname;
+      const category = categoryForFilename(filename);
+      if (!category) return null;
+      return {
+        id: blob.pathname,
+        title: titleFromFilename(filename, category),
+        category,
+        src: blob.url,
+        uploadedAt: blob.uploadedAt,
+      };
+    })
+    .filter((item): item is PortfolioItem & { uploadedAt: Date } => item !== null)
+    // Newest uploads first.
+    .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
+
+  return items.map(({ uploadedAt: _uploadedAt, ...item }) => item);
+}

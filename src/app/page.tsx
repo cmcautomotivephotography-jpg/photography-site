@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { siteConfig } from "@/lib/site";
-import { portfolioItems, categoryLabels } from "@/lib/portfolio";
+import PortfolioTeaser from "@/components/PortfolioTeaser";
 
 const services = [
   {
@@ -16,8 +16,6 @@ const services = [
 ];
 
 export default function HomePage() {
-  const teaser = portfolioItems.slice(0, 3);
-
   return (
     <>
       {/* Hero */}
@@ -72,28 +70,7 @@ export default function HomePage() {
               View Portfolio
             </Link>
           </div>
-          <div className="portfolio-grid">
-            {teaser.map((item) => {
-              const hue = (item.id * 47) % 360;
-              return (
-                <figure key={item.id} className="portfolio-tile">
-                  <div
-                    className="portfolio-placeholder"
-                    style={{
-                      backgroundImage: `linear-gradient(135deg, hsl(${hue} 12% 16%), hsl(${hue} 14% 26%))`,
-                    }}
-                    aria-hidden="true"
-                  />
-                  <figcaption className="portfolio-caption">
-                    <span className="portfolio-tag">
-                      {categoryLabels[item.category]}
-                    </span>
-                    <span className="portfolio-title">{item.title}</span>
-                  </figcaption>
-                </figure>
-              );
-            })}
-          </div>
+          <PortfolioTeaser />
         </div>
       </section>
 

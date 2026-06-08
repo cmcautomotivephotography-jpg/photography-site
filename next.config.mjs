@@ -1,15 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // When you swap the placeholder portfolio tiles for real images hosted
-  // somewhere remote (e.g. Supabase Storage), add the host here so that
-  // next/image is allowed to optimize them. Example:
-  //
-  // images: {
-  //   remotePatterns: [
-  //     { protocol: "https", hostname: "your-project.supabase.co" },
-  //   ],
-  // },
+  images: {
+    remotePatterns: [
+      // Vercel Blob public URLs look like:
+      //   https://<store-id>.public.blob.vercel-storage.com/<file>
+      // Allow any store id so next/image can optimize portfolio photos.
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
