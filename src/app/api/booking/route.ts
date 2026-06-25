@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
+import { sendInquiryNotification } from "@/lib/notify";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -85,6 +86,24 @@ export async function POST(request: Request) {
       hint: error.hint,
     });
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Notify the studio by email. The inquiry is already saved at this point, so
+  // a mail failure must NOT fail the request — log it and still return success.
+  try {
+    await sendInquiryNotification({
+      firstName,
+      lastName,
+      email,
+      phone,
+      company,
+      jobType,
+      description,
+      preferredDate,
+      message,
+    });
+  } catch (emailError) {
+    console.error("Failed to send inquiry notification email:", emailError);
   }
 
   return NextResponse.json({ ok: true, jobId: data });
