@@ -855,6 +855,10 @@ img {
   gap: 0.5rem;
 }
 
+.footer-contact a.footer-social:hover {
+  color: var(--accent);
+}
+
 .footer-bottom {
   border-top: 1px solid var(--border);
   padding: 20px 24px;

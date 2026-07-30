@@ -21,5 +21,6 @@ export const siteConfig = {
   location: "South Jordan, UT",
   social: {
     instagram: "https://www.instagram.com/cmc___photographyslc",
+    linkedin: "https://www.linkedin.com/company/143031964",
   },
 } as const;
