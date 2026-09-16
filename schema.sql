@@ -1,15 +1,21 @@
 -- ============================================================================
---  Aperture Studio — Supabase schema
+--  CMC Photography — vanilla Postgres schema (self-hosted, behind PostgREST)
 -- ----------------------------------------------------------------------------
---  Run this in the Supabase dashboard:  SQL Editor -> New query -> paste -> Run
+--  Run inside the Postgres container, e.g.:
+--    docker exec -i <postgres-container> psql -U <superuser> -d <database> < schema.sql
 --
---  This file is SAFE to run on an existing project — every statement uses
---  "if not exists" / "create or replace", so it will not clobber existing data.
+--  Safe to re-run: every statement uses "if not exists" / "create or replace".
 --
---  IMPORTANT — matching YOUR existing schema:
---  The booking API calls the `submit_inquiry()` function below, which writes to
---  these exact columns. If your existing `clients` / `jobs` tables use different
---  column names, edit the INSERT statements inside the function to match.
+--  Run order matters:
+--    1. This file (creates the tables and submit_inquiry()).
+--    2. The cmc_app role SQL (grants EXECUTE on submit_inquiry to cmc_app and
+--       revokes the default PUBLIC execute). If you already created cmc_app
+--       before this function existed, re-run its GRANT/REVOKE statements now.
+--
+--  No RLS and no anon/authenticated grants here: access control is handled
+--  entirely by the cmc_app role, which has zero table grants and can only
+--  EXECUTE submit_inquiry(). The function is SECURITY DEFINER so it can write
+--  to the tables on cmc_app's behalf.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -40,20 +46,9 @@ create index if not exists jobs_client_id_idx on public.jobs (client_id);
 create index if not exists jobs_status_idx     on public.jobs (status);
 
 -- ---------------------------------------------------------------------------
--- 2. Row Level Security
---    We keep both tables locked down. The public site never reads or writes
---    them directly with the anon key — it can only call submit_inquiry()
---    (defined below), which runs with elevated rights. This means a leaked
---    anon key CANNOT be used to read your clients' contact information.
--- ---------------------------------------------------------------------------
-alter table public.clients enable row level security;
-alter table public.jobs    enable row level security;
-
--- (No anon SELECT/INSERT/UPDATE/DELETE policies are created on purpose.)
-
--- ---------------------------------------------------------------------------
--- 3. Booking function: find-or-create the client, then create the job.
---    Atomic, and the only thing the public form is allowed to call.
+-- 2. Booking function: find-or-create the client, then create the job.
+--    Atomic, and the only thing the public booking form is allowed to call
+--    (via PostgREST at POST /rpc/submit_inquiry, running as cmc_app).
 -- ---------------------------------------------------------------------------
 create or replace function public.submit_inquiry(
   p_first_name           text,
@@ -119,7 +114,5 @@ begin
 end;
 $$;
 
--- Allow the public booking form (anon key) and signed-in users to call it.
-grant execute on function public.submit_inquiry(
-  text, text, text, text, text, text, text, date, text
-) to anon, authenticated;
+-- Make PostgREST discover the function without a container restart.
+notify pgrst, 'reload schema';

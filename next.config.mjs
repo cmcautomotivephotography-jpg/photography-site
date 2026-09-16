@@ -3,12 +3,12 @@ const nextConfig = {
   reactStrictMode: true,
   images: {
     remotePatterns: [
-      // Vercel Blob public URLs look like:
-      //   https://<store-id>.public.blob.vercel-storage.com/<file>
-      // Allow any store id so next/image can optimize portfolio photos.
+      // Self-hosted MinIO behind the Cloudflare Tunnel; the bucket has
+      // anonymous read so next/image can fetch and optimize portfolio photos.
       {
         protocol: "https",
-        hostname: "*.public.blob.vercel-storage.com",
+        hostname: "storage.cmcphotographyslc.com",
+        pathname: "/photography-images/**",
       },
     ],
   },

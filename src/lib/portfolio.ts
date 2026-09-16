@@ -49,57 +49,86 @@ function titleFromFilename(filename: string, category: PortfolioCategory): strin
 }
 
 /**
- * Dynamically fetch the portfolio from Vercel Blob storage. Returns an empty
- * list when the store isn't configured yet (no BLOB_READ_WRITE_TOKEN) so the
- * site still builds and renders. Server-only: the Blob SDK is imported lazily
- * so it never lands in a client bundle.
+ * Server-only: list every object in the MinIO portfolio bucket. The S3 SDK is
+ * imported lazily so it never lands in a client bundle (this module is also
+ * imported by the admin upload page for the category constants).
+ */
+async function listBucketObjects(): Promise<
+  { key: string; url: string; uploadedAt: Date }[]
+> {
+  const { getS3Client, S3_BUCKET, publicObjectUrl } = await import("./s3");
+  const client = getS3Client();
+  if (!client) return [];
+
+  const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+
+  const objects: { key: string; url: string; uploadedAt: Date }[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: S3_BUCKET,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    for (const obj of page.Contents ?? []) {
+      if (!obj.Key) continue;
+      objects.push({
+        key: obj.Key,
+        url: publicObjectUrl(obj.Key),
+        uploadedAt: obj.LastModified ?? new Date(0),
+      });
+    }
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return objects;
+}
+
+/**
+ * Dynamically fetch the portfolio from MinIO. Returns an empty list when the
+ * store isn't configured yet (no S3_* env vars) so the site still builds and
+ * renders.
  */
 export async function getPortfolioItems(): Promise<PortfolioItem[]> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return [];
+  const objects = await listBucketObjects();
 
-  const { list } = await import("@vercel/blob");
-  const { blobs } = await list();
-
-  const items = blobs
-    .map((blob) => {
-      const filename = blob.pathname.split("/").pop() ?? blob.pathname;
+  return objects
+    .map((obj) => {
+      const filename = obj.key.split("/").pop() ?? obj.key;
       const category = categoryForFilename(filename);
       if (!category) return null;
       return {
-        id: blob.pathname,
+        id: obj.key,
         title: titleFromFilename(filename, category),
         category,
-        src: blob.url,
-        uploadedAt: blob.uploadedAt,
+        src: obj.url,
+        uploadedAt: obj.uploadedAt,
       };
     })
     .filter((item): item is PortfolioItem & { uploadedAt: Date } => item !== null)
     // Newest uploads first.
-    .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
-
-  return items.map(({ uploadedAt: _uploadedAt, ...item }) => item);
+    .sort((a, b) => +b.uploadedAt - +a.uploadedAt)
+    .map(({ uploadedAt: _uploadedAt, ...item }) => item);
 }
 
 /**
- * URL of the most recently uploaded image in Blob storage, used as the home
- * hero background. Returns null when the store is empty or unconfigured (the
- * hero then falls back to its gradient). Resilient by design: any error
- * resolves to null so a Blob hiccup can never break the home page.
+ * URL of the most recently uploaded image, used as the home hero background.
+ * Returns null when the store is empty or unconfigured (the hero then falls
+ * back to its gradient). Resilient by design: any error resolves to null so a
+ * storage hiccup can never break the home page.
  */
 export async function getLatestImageUrl(): Promise<string | null> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
-
   try {
-    const { list } = await import("@vercel/blob");
-    const { blobs } = await list();
+    const objects = await listBucketObjects();
 
-    const newest = blobs
-      .filter((blob) => /\.(jpe?g|png|webp|avif|gif)$/i.test(blob.pathname))
-      .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))[0];
+    const newest = objects
+      .filter((obj) => /\.(jpe?g|png|webp|avif|gif)$/i.test(obj.key))
+      .sort((a, b) => +b.uploadedAt - +a.uploadedAt)[0];
 
     return newest?.url ?? null;
   } catch (error) {
-    console.error("Failed to load hero image from Blob:", error);
+    console.error("Failed to load hero image from MinIO:", error);
     return null;
   }
 }

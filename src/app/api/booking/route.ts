@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getSupabaseClient } from "@/lib/supabase";
 import { sendInquiryNotification } from "@/lib/notify";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,50 +41,74 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid job type." }, { status: 400 });
   }
 
-  const supabase = getSupabaseClient();
-  if (!supabase) {
+  // PostgREST endpoint on the home server, reached through the Cloudflare
+  // Tunnel. Server-only env var — the browser never talks to it directly.
+  const postgrestUrl = process.env.POSTGREST_URL?.trim()?.replace(/\/+$/, "");
+  if (!postgrestUrl) {
     return NextResponse.json(
-      {
-        error:
-          "The booking system isn't configured yet. Add your Supabase URL and anon key to .env.local.",
-      },
+      { error: "The booking system isn't configured yet. Set POSTGREST_URL." },
       { status: 503 },
     );
   }
 
   // The heavy lifting (find-or-create client, then create the linked job with
   // status "Inquiry") happens atomically inside the `submit_inquiry` Postgres
-  // function. See supabase-schema.sql. This keeps the clients table locked down
-  // under RLS so the public anon key can't read other people's contact info.
-  const { data, error } = await supabase.rpc("submit_inquiry", {
-    p_first_name: firstName,
-    p_last_name: lastName,
-    p_email: email,
-    p_phone: phone,
-    p_company: company,
-    p_job_type: jobType,
-    p_description: description,
-    p_preferred_shoot_date: preferredDate,
-    p_message: message,
-  });
-
-  if (error) {
-    // Surface the real Postgres/PostgREST error so failures are debuggable in
-    // both the Vercel logs and the response. When the function works from the
-    // SQL editor but fails here, the usual causes are:
-    //   1. The `anon` role lacks EXECUTE on submit_inquiry — run the GRANT at
-    //      the bottom of supabase-schema.sql.
-    //   2. PostgREST's schema cache is stale — in Supabase go to
-    //      Settings -> API -> "Reload schema cache" (or run in SQL:
-    //      NOTIFY pgrst, 'reload schema';).
-    //   3. The function body references a column your tables don't have.
-    console.error("Supabase submit_inquiry error:", {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
+  // function — see schema.sql. PostgREST exposes it at /rpc/submit_inquiry and
+  // runs it as the EXECUTE-only cmc_app role, so the clients table stays
+  // unreadable from the outside.
+  let jobId: unknown;
+  try {
+    const res = await fetch(`${postgrestUrl}/rpc/submit_inquiry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        p_first_name: firstName,
+        p_last_name: lastName,
+        p_email: email,
+        p_phone: phone,
+        p_company: company,
+        p_job_type: jobType,
+        p_description: description,
+        p_preferred_shoot_date: preferredDate,
+        p_message: message,
+      }),
     });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+
+    if (!res.ok) {
+      // PostgREST returns { code, message, details, hint } for Postgres errors.
+      // When the function works via psql but fails here, the usual causes are:
+      //   1. cmc_app lacks EXECUTE on submit_inquiry — re-run the GRANT.
+      //   2. PostgREST's schema cache is stale — NOTIFY pgrst, 'reload schema';
+      let pgError: {
+        message?: string;
+        code?: string;
+        details?: string;
+        hint?: string;
+      } = {};
+      try {
+        pgError = await res.json();
+      } catch {
+        // Non-JSON body (e.g. a Cloudflare error page) — fall through.
+      }
+      console.error("PostgREST submit_inquiry error:", {
+        status: res.status,
+        ...pgError,
+      });
+      return NextResponse.json(
+        { error: pgError.message ?? "Could not save your inquiry." },
+        { status: 500 },
+      );
+    }
+
+    // The function returns uuid; PostgREST serializes it as a JSON string.
+    jobId = await res.json();
+  } catch (err) {
+    console.error("Could not reach PostgREST:", err);
+    return NextResponse.json(
+      { error: "Could not save your inquiry. Please try again shortly." },
+      { status: 502 },
+    );
   }
 
   // Notify the studio by email. The inquiry is already saved at this point, so
@@ -106,5 +129,5 @@ export async function POST(request: Request) {
     console.error("Failed to send inquiry notification email:", emailError);
   }
 
-  return NextResponse.json({ ok: true, jobId: data });
+  return NextResponse.json({ ok: true, jobId });
 }

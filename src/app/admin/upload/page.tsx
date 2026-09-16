@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { upload } from "@vercel/blob/client";
 import { ADMIN_PASSWORD } from "@/lib/admin";
 import {
   categoryLabels,
@@ -12,16 +11,29 @@ import {
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
 
-/** Make a safe, lowercase filename while keeping the extension. */
-function sanitizeFilename(name: string): string {
-  const lower = name.toLowerCase();
-  const dot = lower.lastIndexOf(".");
-  const ext = dot > -1 ? lower.slice(dot) : "";
-  const base =
-    (dot > -1 ? lower.slice(0, dot) : lower)
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "photo";
-  return `${base}${ext}`;
+/**
+ * PUT the file to a presigned MinIO URL. XMLHttpRequest instead of fetch
+ * because fetch has no upload-progress events.
+ */
+function putWithProgress(
+  url: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed (HTTP ${xhr.status}).`));
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.send(file);
+  });
 }
 
 type UploadState = "idle" | "uploading" | "success" | "error";
@@ -53,16 +65,24 @@ function CategoryUploader({
     setState("uploading");
 
     try {
-      const pathname = `${categoryPrefixes[category]}${sanitizeFilename(file.name)}`;
-      const result = await upload(pathname, file, {
-        access: "public",
-        handleUploadUrl: "/api/admin/upload",
-        clientPayload: JSON.stringify({ password }),
-        contentType: file.type,
-        onUploadProgress: ({ percentage }) =>
-          setProgress(Math.round(percentage)),
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          category,
+          filename: file.name,
+          contentType: file.type,
+        }),
       });
-      setUploadedUrl(result.url);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Could not start the upload.");
+      }
+
+      await putWithProgress(json.uploadUrl, file, setProgress);
+
+      setUploadedUrl(json.publicUrl);
       setState("success");
     } catch (e) {
       setState("error");
