@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { ADMIN_PASSWORD } from "@/lib/admin";
 import {
   categoryLabels,
   categoryPrefixes,
@@ -153,13 +152,24 @@ export default function AdminUploadPage() {
   const [password, setPassword] = useState<string | null>(null);
   const [authError, setAuthError] = useState("");
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (input === ADMIN_PASSWORD) {
-      setPassword(input);
-      setAuthError("");
-    } else {
-      setAuthError("Incorrect password.");
+    setAuthError("");
+    // The password never ships to the browser — ask the server to check it.
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: input }),
+      });
+      if (res.ok) {
+        setPassword(input);
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setAuthError(json.error ?? "Incorrect password.");
+      }
+    } catch {
+      setAuthError("Could not verify the password. Please try again.");
     }
   }
 

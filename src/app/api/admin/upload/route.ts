@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ADMIN_PASSWORD } from "@/lib/admin";
 import { getS3Client, S3_BUCKET, publicObjectUrl } from "@/lib/s3";
 import { categoryPrefixes, type PortfolioCategory } from "@/lib/portfolio";
 
@@ -38,8 +37,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // Re-check the password server-side so a URL can't be minted just by
-  // hitting this endpoint directly.
-  if (body.password !== ADMIN_PASSWORD) {
+  // hitting this endpoint directly. Server-only env var — never NEXT_PUBLIC_.
+  const adminPassword = process.env.ADMIN_PASSWORD?.trim();
+  if (!adminPassword) {
+    return NextResponse.json(
+      { error: "Admin uploads aren't configured. Set ADMIN_PASSWORD." },
+      { status: 503 },
+    );
+  }
+  if (body.password !== adminPassword) {
     return NextResponse.json({ error: "Invalid admin password." }, { status: 401 });
   }
 
